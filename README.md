@@ -30,7 +30,7 @@
 
 O **InfraMed IoT** é o componente de hardware do ecossistema InfraMed, materializando a ponte entre o mundo físico e o sistema de gestão hospitalar. Este projeto consiste em um dispositivo embarcado, construído com um microcontrolador **ESP32**, projetado para automatizar e garantir a precisão no processo de administração de medicamentos.
 
-O dispositivo guia o profissional de saúde através de um fluxo simples e intuitivo para registrar a pesagem de medicamentos, associando-a diretamente a um atendimento específico. Os dados coletados são enviados via Wi-Fi para a **API RESTful InfraMed**, garantindo que as informações estejam sempre atualizadas e centralizadas, reduzindo erros manuais e otimizando o tempo da equipe.
+O dispositivo guia o profissional de saúde através de um fluxo simples e intuitivo para registrar a pesagem de medicamentos, associando-a diretamente a um atendimento específico. Os dados coletados são enviados via Wi-Fi para o backend [InfraMed](https://github.com/matheus05dev/BackendMonitoramentoPacientes), garantindo que as informações estejam sempre atualizadas e centralizadas, reduzindo erros manuais e otimizando o tempo da equipe.
 
 Este projeto é a ponta de lança do monitoramento em tempo real, demonstrando a aplicação prática de IoT no setor da saúde para criar um ambiente mais seguro e eficiente.
 
