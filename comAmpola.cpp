@@ -4,8 +4,6 @@
 #include <Adafruit_SSD1306.h>
 #include <HX711.h>
 #include <Keypad.h>
-#include <WiFi.h>
-#include <HTTPClient.h>
 
 // ==========================================
 // 1. CONFIGURAÇÕES DE HARDWARE
@@ -15,13 +13,6 @@
 #define DOUT 15 
 #define CLK 2   
 HX711 scale;
-
-// --- Configurações Wi-Fi ---
-const char *ssid = "Senai-IoT";
-const char *password = "senaiiot";
-
-// --- Configurações do Servidor HTTP ---
-const char *serverBaseUrl = "http://192.168.1.11:8080/api/leituras/atendimento/"; // URL base para o POST
 
 // --- LEDs ---
 #define LED_VERDE 18   
@@ -52,7 +43,6 @@ Keypad customKeypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 // ==========================================
 
 const float TOLERANCIA_GRAMAS = 0.5;
-boolean primeiraMedicaoBolsa = true;
 
 // Variáveis Numéricas
 float pesoReferencia = 0.0;
@@ -94,10 +84,7 @@ int modeSelected = 0; // 1: Precisão, 2: Estimativa
 // ==========================================
 // 3. PROTÓTIPOS DE FUNÇÕES
 // ==========================================
-void connectToWiFi();
-void displayWifiStatus(const char *status);
 void displayMenuScreen();
-void sendReadingToServer(String condicaoSaude);
 void displayInputScreen(const char *title, const char *label, String &input, const char *units = "");
 void displayWeighingScreen(const char *title, float currentValue, const char *instruction);
 void displayResultScreen(const char *title, const char *message, bool success);
@@ -138,11 +125,8 @@ void setup()
     // Inicializa Balança
     Serial.println("Inicializando Balanca...");
     scale.begin(DOUT, CLK);
-    scale.set_scale(2516.59); // SEU VALOR DE CALIBRAÇÃO
+    scale.set_scale(-2516.59); // SEU VALOR DE CALIBRAÇÃO
     scale.tare();
-
-     // Conexão Wi-Fi
-    connectToWiFi();
 
     Serial.println("Setup Concluido. Indo para Menu.");
     currentState = STATE_MENU;
@@ -201,19 +185,15 @@ void loop()
         
         // --- 3. ESTADOS DE PESAGEM (MODO 2) ---
         else if (currentState == STATE_T_WEIGH_SORO_BAG) {
-          pesoBolsaSoro = scale.get_units(10); 
-          Serial.print("DEBUG: Peso Bolsa Soro = "); Serial.println(pesoBolsaSoro);
-          if (primeiraMedicaoBolsa){
-            Serial.println("DEBUG: Enviando MEDICACAO_EM_ANDAMENTO");
-              sendReadingToServer("MEDICACAO_EM_ANDAMENTO");
-              primeiraMedicaoBolsa = false;
-          }
-            if (pesoBolsaSoro <= 0.0) {
-              Serial.println("DEBUG: Reiniciando.");
-              sendReadingToServer("MEDICACAO_FINALIZADA");
-              displayResultScreen("SUCESSO", "FINALIZADO", true); 
-              delay(5000);
-              resetAllInputs();
+            if (key == '#') {
+                pesoBolsaSoro = scale.get_units(10); 
+                currentState = STATE_T_CALCULATE_AND_SEND;
+            } else if (key == '*') { tareScale(); } 
+        }
+        else if (currentState == STATE_T_CALCULATE_AND_SEND) {
+            if (key == '#') {
+                tempoEstimadoCalculado = (pesoBolsaSoro / velocidadeInfusao) * 60.0;
+                displayResultScreen("SUCESSO", "CALCULO OK", true); 
             } else if (key == '1') { resetAllInputs(); } 
         }
         
@@ -239,10 +219,10 @@ void loop()
         case STATE_P_VALIDATE_AND_SEND: displayValidationScreen(); break; 
         
         case STATE_T_INPUT_ATENDIMENTO_ID: displayInputScreen("T1: ID ATEND.", "ID:", inputAtendimentoId); break;
-        //case STATE_T_INPUT_VELOCIDADE: displayInputScreen("T2: VELOCIDADE", "mL/h:", inputVelocidadeStr, " mL/h"); break;
+        case STATE_T_INPUT_VELOCIDADE: displayInputScreen("T2: VELOCIDADE", "mL/h:", inputVelocidadeStr, " mL/h"); break;
         
         case STATE_T_WEIGH_SORO_BAG: displayWeighingScreen("T3: PESAR SORO", scale.get_units(5), "Inicial (# ok)"); break;
-        case STATE_T_CALCULATE_AND_SEND: displayMenuScreen(); break; 
+        case STATE_T_CALCULATE_AND_SEND: displayCalculationScreen(); break; 
         
         default: break;
     }
@@ -253,49 +233,6 @@ void loop()
 // 6. FUNÇÕES AUXILIARES E LÓGICA
 // ==========================================
 
-void connectToWiFi()
-{
-  displayWifiStatus("Conectando...");
-  WiFi.begin(ssid, password);
-
-  int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 40)
-  {
-    delay(500);
-    Serial.print(".");
-    attempts++;
-    display.print(".");
-    display.display();
-  }
-
-  if (WiFi.status() == WL_CONNECTED)
-  {
-    Serial.println("\nWiFi Conectado!");
-    Serial.print("IP: ");
-    Serial.println(WiFi.localIP());
-    displayWifiStatus("CONECTADO!");
-    delay(1500);
-  }
-  else
-  {
-    Serial.println("\nFalha na conexao WiFi!");
-    displayWifiStatus("ERRO Wi-Fi!");
-    for (;;);
-  }
-}
-
-void displayWifiStatus(const char *status)
-{
-  display.clearDisplay();
-  display.setTextSize(1);
-  display.setCursor(0, 0);
-  display.println("Wi-Fi Status:");
-  display.setTextSize(2);
-  display.setCursor(0, 24);
-  display.println(status);
-  display.display();
-}
-
 void handleKeypadInput(char key)
 {
     String *targetInput = nullptr;
@@ -304,20 +241,16 @@ void handleKeypadInput(char key)
 
     // Identifica qual variável deve receber o número
     if (currentState == STATE_P_INPUT_ATENDIMENTO_ID) {
-        targetInput = &inputAtendimentoId; 
-        nextState = STATE_P_INPUT_MEDICACAO_CODIGO;
+        targetInput = &inputAtendimentoId; nextState = STATE_P_INPUT_MEDICACAO_CODIGO;
     } else if (currentState == STATE_P_INPUT_MEDICACAO_CODIGO) {
-        targetInput = &inputMedicacaoCodigo; 
-        nextState = STATE_P_INPUT_PESO_REFERENCIA;
+        targetInput = &inputMedicacaoCodigo; nextState = STATE_P_INPUT_PESO_REFERENCIA;
     } else if (currentState == STATE_P_INPUT_PESO_REFERENCIA) {
-        targetInput = &inputPesoReferenciaStr; 
-        nextState = STATE_P_WEIGH_FULL_AMPOULE; 
-        isDecimalAllowed = true;
+        targetInput = &inputPesoReferenciaStr; nextState = STATE_P_WEIGH_FULL_AMPOULE; isDecimalAllowed = true;
     } else if (currentState == STATE_T_INPUT_ATENDIMENTO_ID) {
-        targetInput = &inputAtendimentoId; 
-        nextState = STATE_T_WEIGH_SORO_BAG;
-    } 
-    else {
+        targetInput = &inputAtendimentoId; nextState = STATE_T_INPUT_VELOCIDADE;
+    } else if (currentState == STATE_T_INPUT_VELOCIDADE) {
+        targetInput = &inputVelocidadeStr; nextState = STATE_T_WEIGH_SORO_BAG; isDecimalAllowed = true;
+    } else {
         Serial.print("ERRO: Estado sem input definido: "); Serial.println(currentState);
         return;
     }
@@ -335,17 +268,21 @@ void handleKeypadInput(char key)
             targetInput->remove(targetInput->length() - 1);
         }
     } else if (key == '#') {
-       // if (targetInput->length() > 0) {
+        if (targetInput->length() > 0) {
             // Conversões Especiais ao confirmar
             if (currentState == STATE_P_INPUT_PESO_REFERENCIA) {
                 pesoReferencia = inputPesoReferenciaStr.toFloat();
-            } 
+            } else if (currentState == STATE_T_INPUT_VELOCIDADE) {
+                velocidadeInfusao = inputVelocidadeStr.toFloat();
+                if (velocidadeInfusao <= 0) {
+                    displayResultScreen("ERRO", "VELOCIDADE > 0", false);
+                    return;
+                }
+            }
             currentState = nextState; 
             display.clearDisplay();
             Serial.print("Input Confirmado. Novo Estado: "); Serial.println(currentState);
-            Serial.print("currentState: ");
-            Serial.println(currentState);
-      //  }
+        }
     }
 }
 
@@ -366,7 +303,6 @@ void resetAllInputs() {
     pesoReferencia = 0; pesoAmpolaCheia = 0; pesoAmpolaVazia = 0;
     pesoDispensaCalculado = 0; pesoBolsaSoro = 0; 
     velocidadeInfusao = 0; tempoEstimadoCalculado = 0;
-    primeiraMedicaoBolsa = true;
     
     digitalWrite(LED_VERDE, LOW); digitalWrite(LED_VERMELHO, LOW);
     currentState = STATE_MENU;
@@ -461,62 +397,4 @@ void displayResultScreen(const char *title, const char *message, bool success) {
     
     delay(2000);
     resetAllInputs();
-}
-
-void sendReadingToServer(String condicaoSaude)
-{
-  if (WiFi.status() != WL_CONNECTED)
-  {
-    Serial.println("ERRO: Wi-Fi desconectado. Nao foi possivel enviar.");
-    displayWifiStatus("Wi-Fi OFF");
-    delay(2000);
-    return;
-  }
-
-  // Monta o JSON
-  StaticJsonDocument<256> doc;
-  doc["valor"] = pesoBolsaSoro;
-  doc["tipoDado"] = "MEDICACAO";
-  doc["unidadeMedida"] = "GRAMAS";
-  doc["condicaoSaude"] = condicaoSaude;
-  doc["codigo"] = 12;
-  doc["atendimentoId"] = inputAtendimentoId.toInt();
-
-  String jsonPayload;
-  serializeJson(doc, jsonPayload);
-
-  // Constrói a URL completa com o ID do atendimento
-  String fullUrl = String(serverBaseUrl) + inputAtendimentoId;
-
-  // Envia a requisição POST
-  HTTPClient http;
-  http.begin(fullUrl);
-  http.addHeader("Content-Type", "application/json");
-  Serial.println("Enviando POST para: " + fullUrl);
-  Serial.println("Payload: " + jsonPayload);
-
-  int httpCode = http.POST(jsonPayload);
-
-  display.clearDisplay();
-  display.setTextSize(1);
-  display.setCursor(0, 0);
-
-  if (httpCode > 0)
-  {
-    Serial.printf("HTTP POST... codigo: %d\n", httpCode);
-    display.printf("Envio: %d\n", httpCode);
-    if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_CREATED)
-    {
-      display.println("SUCESSO!");
-    }
-  }
-  else
-  {
-    Serial.printf("HTTP POST... falhou, erro: %s\n", http.errorToString(httpCode).c_str());
-    display.println("FALHA NO ENVIO");
-  }
-
-  http.end();
-  display.display();
-  delay(2000); // Mostra o status do envio por 2 segundos
 }
