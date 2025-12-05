@@ -21,7 +21,7 @@ const char *ssid = "Senai-IoT";
 const char *password = "senaiiot";
 
 // --- Configurações do Servidor HTTP ---
-const char *serverBaseUrl = "http://192.168.1.11:8080/api/leituras/atendimento/"; // URL base para o POST
+const char *serverBaseUrl = "http://192.168.1.14:8080/api/leituras/atendimento/"; // URL base para o POST
 
 // --- LEDs ---
 #define LED_VERDE 18   
@@ -138,7 +138,7 @@ void setup()
     // Inicializa Balança
     Serial.println("Inicializando Balanca...");
     scale.begin(DOUT, CLK);
-    scale.set_scale(2516.59); // SEU VALOR DE CALIBRAÇÃO
+    scale.set_scale(2526.0); // SEU VALOR DE CALIBRAÇÃO
     scale.tare();
 
      // Conexão Wi-Fi
@@ -199,24 +199,6 @@ void loop()
             } else if (key == '1') { resetAllInputs(); } 
         }
         
-        // --- 3. ESTADOS DE PESAGEM (MODO 2) ---
-        else if (currentState == STATE_T_WEIGH_SORO_BAG) {
-          pesoBolsaSoro = scale.get_units(10); 
-          Serial.print("DEBUG: Peso Bolsa Soro = "); Serial.println(pesoBolsaSoro);
-          if (primeiraMedicaoBolsa){
-            Serial.println("DEBUG: Enviando MEDICACAO_EM_ANDAMENTO");
-              sendReadingToServer("MEDICACAO_EM_ANDAMENTO");
-              primeiraMedicaoBolsa = false;
-          }
-            if (pesoBolsaSoro <= 0.0) {
-              Serial.println("DEBUG: Reiniciando.");
-              sendReadingToServer("MEDICACAO_FINALIZADA");
-              displayResultScreen("SUCESSO", "FINALIZADO", true); 
-              delay(5000);
-              resetAllInputs();
-            } else if (key == '1') { resetAllInputs(); } 
-        }
-        
         // --- 4. ESTADOS DE DIGITAÇÃO (ELSE) ---
         else
         {
@@ -241,11 +223,31 @@ void loop()
         case STATE_T_INPUT_ATENDIMENTO_ID: displayInputScreen("T1: ID ATEND.", "ID:", inputAtendimentoId); break;
         //case STATE_T_INPUT_VELOCIDADE: displayInputScreen("T2: VELOCIDADE", "mL/h:", inputVelocidadeStr, " mL/h"); break;
         
-        case STATE_T_WEIGH_SORO_BAG: displayWeighingScreen("T3: PESAR SORO", scale.get_units(5), "Inicial (# ok)"); break;
+        case STATE_T_WEIGH_SORO_BAG: displayWeighingScreen("T2: PESAR SORO", scale.get_units(5), "Inicial (# ok)"); break;
         case STATE_T_CALCULATE_AND_SEND: displayMenuScreen(); break; 
         
         default: break;
     }
+
+   //   --- 3. ESTADOS DE PESAGEM (MODO 2) ---
+        if (currentState == STATE_T_WEIGH_SORO_BAG) {
+          pesoBolsaSoro = scale.get_units(10); 
+          Serial.print("DEBUG: Peso Bolsa Soro = "); Serial.println(pesoBolsaSoro);
+          if (primeiraMedicaoBolsa){
+            Serial.println("DEBUG: Enviando MEDICACAO_EM_ANDAMENTO");
+              sendReadingToServer("MEDICACAO_EM_ANDAMENTO");
+              primeiraMedicaoBolsa = false;
+          }
+            if (pesoBolsaSoro <= 0.0) {
+              Serial.println("DEBUG: Reiniciando.");
+              sendReadingToServer("MEDICACAO_FINALIZADA");
+              displayResultScreen("SUCESSO", "FINALIZADO", true); 
+              delay(5000);
+              resetAllInputs();
+            } else if (key == '1') { resetAllInputs(); } 
+        }
+
+
     delay(50); // Pequeno delay para estabilidade
 }
 
@@ -383,8 +385,8 @@ void displayMenuScreen() {
     display.setTextSize(1); display.setCursor(0, 0); display.println("ESCOLHA O MODO:");
     display.println("---------------------");
     display.setTextSize(2); 
-    display.println("1:Precisao"); 
-    display.println("2:Tempo");
+    display.println("1:Ampola"); 
+    display.println("2:Bolsa");
     display.setTextSize(1); display.setCursor(0, 56); display.println("[1] ou [2]");
     display.display();
 }
