@@ -78,34 +78,60 @@ A escolha das tecnologias foi focada na robustez e na facilidade de desenvolvime
 
 ## 🔄 Fluxo de Funcionamento
 
-O dispositivo opera em uma máquina de estados clara e sequencial:
+O dispositivo opera com uma máquina de estados que guia o usuário por dois modos de operação distintos, selecionáveis em um menu inicial: **Modo Ampola** (para medição precisa de doses) e **Modo Bolsa** (para monitoramento de infusão contínua).
+
+### Menu Principal
 
 1.  **Inicialização:**
+    - O sistema inicializa e conecta-se à rede Wi-Fi.
+    - O display exibe um menu para escolher o modo: `1: Ampola` ou `2: Bolsa`.
 
-    - O sistema inicializa os componentes (Display, LEDs, Balança).
-    - Conecta-se à rede Wi-Fi configurada. O LED vermelho fica aceso durante a tentativa de conexão.
-    - Após a conexão, o LED vermelho apaga e o sistema está pronto.
+---
 
-2.  **ETAPA 1: Inserir ID do Atendimento:**
+### Modo 1: Medição de Ampola (Dispensação Precisa)
 
-    - O display solicita o `ID do Atendimento`.
-    - O usuário digita o ID no teclado e pressiona `#` para confirmar.
+Este modo é projetado para validar se a quantidade de medicamento dispensado de uma ampola corresponde a um valor de referência.
 
-3.  **ETAPA 2: Inserir Código da Medicação:**
+1.  **ETAPA P1: Inserir ID do Atendimento:**
+    - O usuário digita o `ID do Atendimento` e pressiona `#`.
 
-    - O display solicita o `Código da Medicação`.
-    - O usuário digita o código e pressiona `#` para confirmar.
+2.  **ETAPA P2: Inserir Código da Medicação:**
+    - O usuário digita o `Código da Medicação` e pressiona `#`.
 
-4.  **ETAPA 3: Inserir Duração:**
+3.  **ETAPA P3: Inserir Peso de Referência:**
+    - O usuário informa o `Peso de Referência` esperado para a dose (em gramas) e pressiona `#`.
 
-    - O display solicita a `Duração do Procedimento` em minutos.
-    - O usuário digita o valor e pressiona `#` para confirmar.
+4.  **ETAPA P4: Pesar Ampola Cheia:**
+    - O display instrui o usuário a colocar a ampola cheia na balança.
+    - O peso é capturado ao pressionar `#`. A tecla `*` pode ser usada para tarar (zerar) a balança.
 
-5.  **ETAPA 4: Pesagem e Envio:**
-    - O sistema entra no modo de pesagem, exibindo o peso atual em tempo real.
-    - O display mostra as opções: `*` para enviar, `2` para tarar, `1` para reiniciar.
-    - Ao pressionar `*`, o dispositivo monta um payload JSON e o envia via **HTTP POST** para a API InfraMed.
-    - O display e os LEDs fornecem feedback sobre o sucesso ou falha do envio. O LED verde acende em caso de sucesso.
+5.  **ETAPA P5: Pesar Ampola Vazia:**
+    - Após dispensar o medicamento, o usuário coloca a ampola vazia na balança.
+    - O peso é capturado ao pressionar `#`.
+
+6.  **ETAPA P6: Validação:**
+    - O sistema calcula a diferença (`Peso Cheia` - `Peso Vazia`).
+    - O resultado é comparado com o `Peso de Referência`.
+    - O display exibe **"CORRETO"** (LED verde) se a diferença estiver dentro da tolerância ou **"ERRO"** (LED vermelho) caso contrário.
+    - **Observação:** Nesta versão, o envio de dados ao servidor para este modo é uma simulação e não é efetivamente realizado.
+
+---
+
+### Modo 2: Monitoramento de Bolsa de Soro (Infusão Contínua)
+
+Este modo monitora o peso de uma bolsa de soro ou medicação, enviando atualizações de status para o servidor.
+
+1.  **ETAPA T1: Inserir ID do Atendimento:**
+    - O usuário digita o `ID do Atendimento` e pressiona `#`.
+
+2.  **ETAPA T2: Pesar a Bolsa:**
+    - O usuário coloca a bolsa de medicação na balança.
+    - O sistema imediatamente entra em modo de monitoramento contínuo.
+
+3.  **Monitoramento e Envio Automático:**
+    - **Início da Medicação:** Assim que o peso é detectado pela primeira vez, o dispositivo envia um status **`MEDICACAO_EM_ANDAMENTO`** para a API, associado ao ID do atendimento.
+    - **Fim da Medicação:** O sistema continua monitorando o peso. Quando o peso da bolsa chega a zero (ou próximo a zero), o dispositivo envia automaticamente um status **`MEDICACAO_FINALIZADA`**.
+    - O processo é reiniciado após a finalização. A tecla `1` pode ser usada para reiniciar o fluxo a qualquer momento.
 
 ---
 
