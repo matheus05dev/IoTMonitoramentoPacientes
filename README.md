@@ -9,8 +9,6 @@
   <img src="https://img.shields.io/badge/Plataforma-PlatformIO-orange?logo=platformio" alt="PlatformIO">
   <img src="https://img.shields.io/badge/Framework-Arduino-00979D?logo=arduino&logoColor=white" alt="Arduino Framework">
   <img src="https://img.shields.io/badge/Hardware-ESP32-E7352C?logo=espressif&logoColor=white" alt="ESP32">
-  <img src="https://img.shields.io/badge/Quality-SonarQube-4E9BCD?logo=sonarqube" alt="SonarQube">
-  <img src="https://img.shields.io/badge/API-REST-blue" alt="REST API">
 </p>
 
 ---
