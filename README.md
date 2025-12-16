@@ -587,51 +587,6 @@ curl http://192.168.1.14:8080/api/leituras/atendimento/1
 
 ---
 
-### Relação com Outras Entidades do Sistema
-
-O endpoint de leituras se integra com várias entidades do backend:
-
-```mermaid
-erDiagram
-    ATENDIMENTO ||--o{ LEITURA_SENSOR : "possui"
-    PACIENTE ||--o{ ATENDIMENTO : "recebe"
-    FUNCIONARIO ||--o{ ATENDIMENTO : "realiza"
-    QUARTO ||--o{ ATENDIMENTO : "ocorre_em"
-    LEITURA_SENSOR ||--o| NOTIFICACAO : "pode_gerar"
-    
-    ATENDIMENTO {
-        bigint id PK
-        bigint paciente_id FK
-        bigint funcionario_id FK
-        bigint quarto_id FK
-        datetime data_inicio
-        datetime data_fim
-        string diagnostico
-    }
-    
-    LEITURA_SENSOR {
-        bigint id PK
-        bigint atendimento_id FK
-        float valor
-        string tipo_dado
-        string unidade_medida
-        string condicao_saude
-        int codigo
-        datetime timestamp
-    }
-    
-    NOTIFICACAO {
-        bigint id PK
-        bigint leitura_id FK
-        string mensagem
-        string tipo_alerta
-        boolean fechada
-        datetime created_at
-    }
-```
-
----
-
 ### Testando a Integração
 
 #### 1. Teste Manual com curl
